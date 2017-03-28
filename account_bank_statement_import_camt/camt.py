@@ -43,7 +43,7 @@ class CamtParser(object):
                 break
 
     def parse_transaction_details(self, ns, node, transaction):
-        """Parse transaction details (message, party, account...)."""
+        """Parse TxDtls node."""
         # message
         self.add_value_from_node(
             ns, node, [
@@ -64,6 +64,9 @@ class CamtParser(object):
             ],
             transaction, 'ref'
         )
+        amount = self.parse_amount(ns, node)
+        if amount != 0.0:
+            transaction['amount'] = amount
         # remote party values
         party_type = 'Dbtr'
         party_type_node = node.xpath(
@@ -104,10 +107,11 @@ class CamtParser(object):
                     ns, account_node[0], './ns:Othr/ns:Id', transaction,
                     'account_number'
                 )
+        transaction['data'] = etree.tostring(node)
 
-    def parse_transaction(self, ns, node):
-        """Parse transaction (entry) node."""
-        transaction = {}
+    def parse_entry(self, ns, node):
+        """Parse an Ntry node and yield transactions"""
+        transaction = {'name': '/', 'amount': 0}  # fallback defaults
         self.add_value_from_node(
             ns, node, './ns:BkTxCd/ns:Prtry/ns:Cd', transaction,
             'transfer_type'
@@ -118,27 +122,26 @@ class CamtParser(object):
             ns, node, './ns:BookgDt/ns:Dt', transaction, 'execution_date')
         self.add_value_from_node(
             ns, node, './ns:ValDt/ns:Dt', transaction, 'value_date')
+        amount = self.parse_amount(ns, node)
+        if amount != 0.0:
+            transaction['amount'] = amount
+        self.add_value_from_node(
+            ns, node, './ns:AddtlNtryInf', transaction, 'name')
+        self.add_value_from_node(
+            ns, node, [
+                './ns:NtryDtls/ns:RmtInf/ns:Strd/ns:CdtrRefInf/ns:Ref',
+                './ns:NtryDtls/ns:Btch/ns:PmtInfId',
+            ],
+            transaction, 'ref'
+        )
 
-        transaction['amount'] = self.parse_amount(ns, node)
-
-        details_node = node.xpath(
+        details_nodes = node.xpath(
             './ns:NtryDtls/ns:TxDtls', namespaces={'ns': ns})
-        if details_node:
-            self.parse_transaction_details(ns, details_node[0], transaction)
-        if not transaction.get('name'):
-            self.add_value_from_node(
-                ns, node, './ns:AddtlNtryInf', transaction, 'name')
-        if not transaction.get('name'):
-            transaction['name'] = '/'
-        if not transaction.get('ref'):
-            self.add_value_from_node(
-                ns, node, [
-                    './ns:NtryDtls/ns:Btch/ns:PmtInfId',
-                ],
-                transaction, 'ref'
-            )
-        transaction['data'] = etree.tostring(node)
-        return transaction
+        transaction_base = transaction
+        for node in details_nodes:
+            transaction = transaction_base.copy()
+            self.parse_transaction_details(ns, node, transaction)
+            yield transaction
 
     def get_balance_amounts(self, ns, node):
         """Return opening and closing balance.
@@ -190,12 +193,11 @@ class CamtParser(object):
             ns, node, './ns:Acct/ns:Ccy', result, 'currency')
         result['balance_start'], result['balance_end_real'] = (
             self.get_balance_amounts(ns, node))
-        transaction_nodes = node.xpath('./ns:Ntry', namespaces={'ns': ns})
-        result['transactions'] = []
-        for entry_node in transaction_nodes:
-            transaction = self.parse_transaction(ns, entry_node)
-            if transaction:
-                result['transactions'].append(transaction)
+        entry_nodes = node.xpath('./ns:Ntry', namespaces={'ns': ns})
+        transactions = []
+        for entry_node in entry_nodes:
+            transactions.extend(self.parse_entry(ns, entry_node))
+        result['transactions'] = transactions
         return result
 
     def check_version(self, ns, root):

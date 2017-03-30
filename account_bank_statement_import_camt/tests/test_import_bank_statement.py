@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 """Run test to import camt.053 import."""
 # © 2013-2016 Therp BV <http://therp.nl>
+# Copyright 2017 Open Net Sàrl
 # License AGPL-3.0 or later (http://www.gnu.org/licenses/agpl.html).
 import base64
 import difflib

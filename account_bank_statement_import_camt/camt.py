@@ -5,6 +5,7 @@
 import collections
 import re
 from lxml import etree
+from copy import copy
 
 
 class CamtParser(object):
@@ -108,7 +109,6 @@ class CamtParser(object):
                     ns, account_node[0], './ns:Othr/ns:Id', transaction,
                     'account_number'
                 )
-        transaction['data'] = etree.tostring(node)
 
     def parse_entry(self, ns, node):
         """Parse an Ntry node and yield transactions"""
@@ -139,9 +139,17 @@ class CamtParser(object):
         details_nodes = node.xpath(
             './ns:NtryDtls/ns:TxDtls', namespaces={'ns': ns})
         transaction_base = transaction
-        for node in details_nodes:
+        for i, dnode in enumerate(details_nodes):
             transaction = transaction_base.copy()
-            self.parse_transaction_details(ns, node, transaction)
+            self.parse_transaction_details(ns, dnode, transaction)
+            # transactions['data'] should be a synthetic xml snippet which
+            # contains only the TxDtls that's relevant.
+            data = copy(node)
+            for j, dnode in enumerate(data.xpath(
+                    './ns:NtryDtls/ns:TxDtls', namespaces={'ns': ns})):
+                if j != i:
+                    dnode.getparent().remove(dnode)
+            transaction['data'] = etree.tostring(data)
             yield transaction
 
     @staticmethod

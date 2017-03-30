@@ -2,6 +2,7 @@
 """Class to parse camt files."""
 # © 2013-2016 Therp BV <http://therp.nl>
 # License AGPL-3.0 or later (http://www.gnu.org/licenses/agpl.html).
+import collections
 import re
 from lxml import etree
 
@@ -143,6 +144,23 @@ class CamtParser(object):
             self.parse_transaction_details(ns, node, transaction)
             yield transaction
 
+    @staticmethod
+    def _deduplicate_names(transactions):
+        """If two transactions have the same name,
+        add a number at the end to differentiate. """
+        counter = collections.defaultdict(int)
+        for t in transactions:
+            counter[t['name']] += 1
+        numbers = {name: 1 for name, n in counter.iteritems() if n > 1}
+        for t in transactions:
+            name = t['name']
+            try:
+                n = numbers[name]
+            except KeyError:
+                continue
+            t['name'] += " (%d)" % n
+            numbers[name] += 1
+
     def get_balance_amounts(self, ns, node):
         """Return opening and closing balance.
 
@@ -197,6 +215,7 @@ class CamtParser(object):
         transactions = []
         for entry_node in entry_nodes:
             transactions.extend(self.parse_entry(ns, entry_node))
+        self._deduplicate_names(transactions)
         result['transactions'] = transactions
         return result
 

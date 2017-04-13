@@ -7,6 +7,8 @@ import base64
 import difflib
 import pprint
 import tempfile
+import unittest
+
 from openerp.addons.account_bank_statement_import_camt.camt import CamtParser
 from openerp.tests.common import TransactionCase
 from openerp.tools.misc import file_open
@@ -15,7 +17,7 @@ from openerp.tools.misc import file_open
 DATA_DIR = 'account_bank_statement_import_camt/test_files/'
 
 
-class TestParser(TransactionCase):
+class TestParser(unittest.TestCase):
     """Tests for the camt parser itself."""
     def setUp(self):
         super(TestParser, self).setUp()

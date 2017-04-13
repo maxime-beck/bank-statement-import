@@ -16,12 +16,18 @@ class AccountBankStatementImport(models.TransientModel):
     _inherit = 'account.bank.statement.import'
 
     @api.model
+    def _get_camt_parser(self):
+        """ Allows to extend the parser in other modules. """
+        return Parser()
+
+    @api.model
     def _parse_file(self, data_file):
         """Parse a CAMT053 XML file."""
         try:
-            parser = Parser()
+            parser = self._get_camt_parser()
             _logger.debug("Try parsing with camt.")
-            return parser.parse(data_file)
+            res = parser.parse(data_file)
+            return res
         except ValueError:
             try:
                 with zipfile.ZipFile(StringIO.StringIO(data_file)) as data:

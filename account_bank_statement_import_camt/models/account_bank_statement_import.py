@@ -18,7 +18,20 @@ class AccountBankStatementImport(models.TransientModel):
     @api.model
     def _get_camt_parser(self):
         """ Allows to extend the parser in other modules. """
+        bases = []
+        self._get_camt_parser_mixins(bases)
+        Parser = type('CamtParser', tuple(bases), {})
         return Parser()
+
+    @api.model
+    def _get_camt_parser_mixins(self, bases):
+        """ Allows many modules to plug in parser enhancements.
+
+        This method should append its enhanced CamtParser subclass to bases,
+        then do a super call.  This allows cooperative multiple inheritance
+        to do its thing.
+        """
+        bases.append(Parser)
 
     @api.model
     def _parse_file(self, data_file):

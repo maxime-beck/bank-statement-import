@@ -11,5 +11,6 @@ class AccountBankStatementImport(models.TransientModel):
     _inherit = 'account.bank.statement.import'
 
     @api.model
-    def _get_camt_parser(self):
-        return Parser()
+    def _get_camt_parser_mixins(self, bases):
+        bases.append(Parser)
+        super(AccountBankStatementImport, self)._get_camt_parser_mixins(bases)

@@ -12,3 +12,16 @@ class AccountBankStatementLine(models.TransientModel):
     partner_address = fields.Char()
     partner_account = fields.Char()
     partner_bic = fields.Char()
+
+    def get_statement_line_for_reconciliation_widget(self):
+        """ Returns the data required by the bank statement
+        reconciliation widget to display a statement line
+        """
+        data = super(AccountBankStatementLine,
+                     self).get_statement_line_for_reconciliation_widget()
+        if self.partner_address:
+            data['partner_address'] = self.partner_address
+        if self.partner_account:
+            data['partner_account'] = self.partner_account
+
+        return data

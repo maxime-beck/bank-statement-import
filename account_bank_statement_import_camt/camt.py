@@ -139,6 +139,9 @@ class CamtParser(object):
 
         details_nodes = node.xpath(
             './ns:NtryDtls/ns:TxDtls', namespaces={'ns': ns})
+        if len(details_nodes) == 0:
+            yield transaction
+            return
         transaction_base = transaction
         for i, dnode in enumerate(details_nodes):
             transaction = transaction_base.copy()

@@ -22,6 +22,11 @@ class CamtParser(models.AbstractModel):
         sign_node = node.xpath('ns:CdtDbtInd', namespaces={'ns': ns})
         if sign_node and sign_node[0].text == 'DBIT':
             sign = -1
+        amounts_node = node.xpath('./ns:NtryDtls/ns:TxDtls/ns:Amt',
+                                  namespaces={'ns': ns})
+        if amounts_node:
+            for amount_node in amounts_node:
+                amount += float(amount_node.text)
         amount_node = node.xpath('ns:Amt', namespaces={'ns': ns})
         if amount_node:
             amount = sign * float(amount_node[0].text)
@@ -100,7 +105,6 @@ class CamtParser(models.AbstractModel):
             iban_node = account_node[0].xpath(
                 './ns:IBAN', namespaces={'ns': ns})
             if iban_node:
-                transaction['account_number'] = iban_node[0].text
                 bic_node = node.xpath(
                     './ns:RltdAgts/ns:%sAgt/ns:FinInstnId/ns:BIC' % party_type,
                     namespaces={'ns': ns}
@@ -139,6 +143,12 @@ class CamtParser(models.AbstractModel):
                 './ns:NtryDtls/ns:TxDtls/ns:Refs/ns:AcctSvcrRef'
             ],
             transaction, 'ref'
+        )
+        self.add_value_from_node(
+            ns, node, [
+                './ns:NtryRef',
+            ],
+            transaction, 'account_number'
         )
 
         details_nodes = node.xpath(
@@ -180,6 +190,9 @@ class CamtParser(models.AbstractModel):
                         start_balance_node = balance_node[0]
                     if not end_balance_node:
                         end_balance_node = balance_node[-1]
+            if end_balance_node is None:
+                end_balance_node = node.xpath('./ns:Ntry',
+                                              namespaces={'ns': ns})[0]
         return (
             self.parse_amount(ns, start_balance_node),
             self.parse_amount(ns, end_balance_node)
@@ -188,12 +201,6 @@ class CamtParser(models.AbstractModel):
     def parse_statement(self, ns, node):
         """Parse a single Stmt node."""
         result = {}
-        self.add_value_from_node(
-            ns, node, [
-                './ns:Acct/ns:Id/ns:IBAN',
-                './ns:Acct/ns:Id/ns:Othr/ns:Id',
-            ], result, 'account_number'
-        )
         self.add_value_from_node(
             ns, node, './ns:Id', result, 'name')
         self.add_value_from_node(
@@ -207,10 +214,11 @@ class CamtParser(models.AbstractModel):
         for entry_node in entry_nodes:
             transactions.extend(self.parse_entry(ns, entry_node))
         result['transactions'] = transactions
-        result['date'] = sorted(transactions,
-                                key=lambda x: x['date'],
-                                reverse=True
-                                )[0]['date']
+        transactions_on_period = sorted(transactions,
+                                        key=lambda x: x['date'],
+                                        reverse=True)
+        if len(transactions_on_period) > 0:
+            result['date'] = transactions_on_period[0]['date']
         return result
 
     def check_version(self, ns, root):
@@ -224,8 +232,10 @@ class CamtParser(models.AbstractModel):
             raise ValueError('no camt: ' + ns)
         # Check wether version 052 or 053:
         re_camt_version = re.compile(
-            r'(^urn:iso:std:iso:20022:tech:xsd:camt.053.'
+            r'(^urn:iso:std:iso:20022:tech:xsd:camt.054.'
+            r'|^urn:iso:std:iso:20022:tech:xsd:camt.053.'
             r'|^urn:iso:std:iso:20022:tech:xsd:camt.052.'
+            r'|^ISO:camt.054.'
             r'|^ISO:camt.053.'
             r'|^ISO:camt.052.)'
         )
